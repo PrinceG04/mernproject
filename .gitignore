@@ -1,0 +1,3 @@
+# should not be upload on the git
+node_modules
+.env
