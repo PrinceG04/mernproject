@@ -3,7 +3,7 @@ const express = require("express");
 const path = require("path");
 const bodyParser = require("body-parser");
 const hbs = require("hbs");
-// const jwt = require('jsonwebtoken');
+const jwt = require('jsonwebtoken');
 
 const bcrypt = require('bcrypt');
 
@@ -16,7 +16,8 @@ require("./db/conndb");
 
 // const Register = require('./models/register');
 const register = require("./models/register");
-const { notEqual } = require('assert');
+const contact = require("./models/contact");
+// const { notEqual } = require('assert');
 
 // port number
 const port = process.env.PORT || 3000;
@@ -54,12 +55,24 @@ app.get("/signup", (req, res) => {
   res.render("signup");
 });
 
-app.get('/dashboard',auth,(req,res)=>{
+app.get('/dashboard',auth,async(req,res)=>{
   // const userdata = await auth();
   // console.log(userdata)
-  res.render('dashboard',{
-    username: 'My name is ' + req.user.firstname + req.user.lastname + ". I am currently located at " + req.user.address + " and my email id is " + req.user.email + ". Please feel free to contact me any time. Happy to connect."
-  });
+  try {
+    const user_id = req.user._id;
+    const usercontactdata = await contact.findOne({ user: user_id });
+    console.log(usercontactdata);
+
+      res.render("dashboard", {
+        username: req.user.firstname,
+        usercontactdata,
+      });
+
+  } catch (error) {
+    console.log(error);
+    res.status(400).send(error);
+  }
+  
 })
 
 app.get('/logout',auth, async(req,res)=>{
@@ -133,7 +146,7 @@ app.post("/register", async (req, res) => {
   } catch (e) {
     console.log(e);
     console.log('to do something good')
-    res.status(400).send('error loading site');
+    res.status(400).send(e);
   }
 });
 
@@ -145,11 +158,11 @@ app.post("/login", async (req, res) => {
   try {
     const user = await register.findOne({ email: email });
 
-    console.log(user);
+    // console.log(user);
     const isMatch = await bcrypt.compare(password,user.password);
     // const token = await user.generateAuthToken();
 
-    console.log(isMatch)
+    // console.log(isMatch)
     if (isMatch) {
     const token = await user.generateAuthToken();
     res.cookie("jwt", token, {
@@ -172,6 +185,57 @@ app.post("/login", async (req, res) => {
 
   // console.log(appUsers);
 });
+
+
+
+app.post("/contact", async(req, res) => {
+  console.log(req.body);
+
+  try {
+    
+    const token = req.cookies.jwt;
+    // console.log(token);
+    const name = req.body.name;
+    const phone = req.body.phone;
+    const user = jwt.verify(token, process.env.SECRET_KEY);
+    const contactitem = await contact.findOne({usertoken:user._id});
+    console.log(contactitem);
+    if(contactitem){
+      console.log('if')
+     contactitem.contacts.push({name:name,phoneNo:phone});
+      await contactitem.save()
+      res.status(200).redirect('/dashboard')
+    }
+    else{
+      console.log('else');
+      const contactitem = new contact({
+        usertoken: user._id,
+        contacts: [{name: name, phoneNo: phone}]
+        // contacts: contacts.push({ name: name, phone: phone }),
+      });
+      console.log(contactitem);
+      await contactitem.save();
+      res.status(200).redirect('/dashboard')
+    }
+    
+    // console.log(saved)
+    // res.status(201).send('succed')
+  } catch (error) {
+    console.log(error)
+    res.status(400).send(error);
+  }
+  // console.log(req.body.user);
+  
+  
+    //  console.log(userVerify);
+  // req.cookies('jwt');
+
+  
+  
+});
+
+
+
 
 // const crateToken = async() => {
 //   secretKey = "youthavaeonlaseohlnebdonealmehahveunoaye";
